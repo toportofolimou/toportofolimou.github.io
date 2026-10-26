@@ -371,8 +371,12 @@ function renderBudget() {
       ${pocketRows ? `<div class="list">${pocketRows}</div>
         <div class="list-total"><span>${t('total')}</span><span>${money(sv)}</span></div>`
         : `<div class="empty">${t('noPockets')}</div>`}
-    </div>
-    <div class="card">
+    </div>`;
+}
+
+// Κουτί «Αντίγραφο ασφαλείας» — τελευταίο στη σελίδα «Μισθοδοσία - Πάγια έξοδα»
+function backupCard() {
+  return `<div class="card span-2">
       <h2>${t('backup')}</h2>
       <p class="muted" style="margin:0 0 8px;font-size:.9rem">${t('backupText')}</p>
       ${backupStatus()}
@@ -489,7 +493,8 @@ function renderIncome() {
       <div class="list">${fixedRows}</div>
       ${state.fixed.length ? `<div class="list-total"><span>${t('total')}</span><span>${money(fx)}</span></div>` : ''}
     </div>
-    ${afterFixed}`;
+    ${afterFixed}
+    ${backupCard()}`;
 }
 
 /* ---------- Σελίδα: Επαναλαμβανόμενες πληρωμές ---------- */
