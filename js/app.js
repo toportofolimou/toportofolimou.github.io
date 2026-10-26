@@ -11,7 +11,17 @@ const LANG_KEY = 'ta-lefta-mou-lang';
 const INSTALL_KEY = 'ta-lefta-mou-install-hidden';
 const NOTIFIED_KEY = 'ta-lefta-mou-notified';
 const GOAL_NOTIFIED_KEY = 'ta-lefta-mou-goal-notified';
-const TABS = ['income', 'recurring', 'pockets', 'goals', 'budget', 'expenses'];
+const TABS = ['income', 'recurring', 'pockets', 'goals', 'budget', 'expenses', 'trips'];
+
+// Κατηγορίες εξόδων ταξιδιού (τα ονόματα είναι στο i18n.js)
+const TRIP_CATS = [
+  { id: 'transport', color: '#457b9d' },
+  { id: 'stay', color: '#7b4cc2' },
+  { id: 'food', color: '#e76f51' },
+  { id: 'fun', color: '#2a9d8f' },
+  { id: 'shopping', color: '#c0398f' },
+  { id: 'other', color: '#8a9499' },
+];
 
 // Κατηγορίες καθημερινών εξόδων (τα ονόματα είναι στο i18n.js)
 const CATS = [
@@ -90,6 +100,7 @@ function applyStaticTexts() {
   $('.tabs [data-tab=pockets]').textContent = t('tabPockets');
   $('.tabs [data-tab=goals]').textContent = t('tabGoals');
   $('.tabs [data-tab=expenses]').textContent = t('tabExpenses');
+  $('.tabs [data-tab=trips]').innerHTML = `<span class="tab-long">${esc(t('tabTrips'))}</span><span class="tab-short">${esc(t('tabTripsShort'))}</span>`;
   updateBadges();
 }
 
@@ -157,7 +168,7 @@ function toast(msg, warn = false) {
 /* ---------- Δεδομένα ---------- */
 
 function emptyState() {
-  return { income: { type: 'fixed', fixed: 0, monthly: {} }, fixed: [], recurring: [], pockets: [], expenses: [], customCats: [], goals: {} };
+  return { income: { type: 'fixed', fixed: 0, monthly: {} }, fixed: [], recurring: [], pockets: [], expenses: [], customCats: [], goals: {}, trips: [] };
 }
 // Καθαρίζει δεδομένα (από τη συσκευή ή από αρχείο) ώστε να μη σπάσει η εφαρμογή
 function normalize(data) {
@@ -178,6 +189,13 @@ function normalize(data) {
     every: REC_EVERY.includes(+r.every) ? +r.every : 1, remind: REC_REMIND.includes(+r.remind) ? +r.remind : 3,
     left: r.left === null || r.left === undefined || r.left === '' ? null : Math.max(0, Math.floor(num(r.left))),
     fixedId: r.fixedId || null,
+  }));
+  s.trips = arr(data.trips).map((tr) => ({
+    id: tr.id || uid(), dest: String(tr.dest || ''), budget: num(tr.budget), created: num(tr.created), done: !!tr.done,
+    expenses: arr(tr.expenses).filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date)).map((e) => ({
+      id: e.id || uid(), date: e.date, amount: num(e.amount),
+      cat: TRIP_CATS.some((c) => c.id === e.cat) ? e.cat : 'other', note: String(e.note || ''), created: num(e.created),
+    })),
   }));
   if (data.goals && typeof data.goals === 'object') {
     for (const [k, v] of Object.entries(data.goals)) if (num(v) > 0) s.goals[k] = num(v);
@@ -782,6 +800,196 @@ function checkGoalNotifications() {
   }
 }
 
+/* ---------- Σελίδα: Καταχώρηση εξόδων ταξιδιού ---------- */
+
+let openTripId = null;      // ποιο ταξίδι είναι ανοιχτό (null = λίστα ταξιδιών)
+let pickedTripCat = null;   // κατηγορία στη γρήγορη καταχώρηση εξόδου ταξιδιού
+
+const tripCat = (id) => TRIP_CATS.find((c) => c.id === id) || TRIP_CATS[TRIP_CATS.length - 1];
+const tripSpent = (tr) => round2(sum(tr.expenses, (e) => e.amount));
+
+function tripCard(tr) {
+  const spent = tripSpent(tr);
+  const lvl = tr.budget > 0 ? goalLevel(spent, tr.budget) : 0;
+  const cls = ['', 'warn', 'over'][lvl];
+  return `<button class="trip-card" data-action="trip-open" data-id="${tr.id}">
+      <div class="goal-top"><span class="avatar small" style="background:var(--brand-bg)">${esc((tr.dest || '?').charAt(0).toUpperCase())}</span>
+        <span class="name"><b>${esc(tr.dest)}</b><small>${tr.done ? t('tripDoneLabel') + ' · ' : ''}${t('tripCount', tr.expenses.length)}</small></span>
+        <span class="goal-amt"><b>${money(spent)}</b> / ${money(tr.budget)}</span></div>
+      <div class="bar ${cls}"><i style="width:${tr.budget > 0 ? Math.min(100, (spent / tr.budget) * 100) : 0}%"></i></div>
+      <div class="goal-bottom ${cls}">
+        <span>${spent > tr.budget ? t('tripOver', money(spent - tr.budget)) : t('goalLeft', money(tr.budget - spent))}</span>
+        <span>${tr.budget > 0 ? pctOf(spent, tr.budget) + '%' : ''}</span>
+      </div>
+    </button>`;
+}
+
+function renderTrips() {
+  const tr = state.trips.find((x) => x.id === openTripId);
+  if (!tr) { openTripId = null; renderTripList(); } else renderTrip(tr);
+}
+
+function renderTripList() {
+  const byNew = (a, b) => b.created - a.created;
+  const active = state.trips.filter((x) => !x.done).sort(byNew);
+  const done = state.trips.filter((x) => x.done).sort(byNew);
+  $('#page-trips').innerHTML = `
+    <div class="card span-2">
+      <h2>${t('tabTrips')}</h2>
+      <p class="muted" style="margin:0 0 12px;font-size:.9rem">${t('tripsHint')}</p>
+      <button class="btn primary wide" data-action="trip-new">${t('tripNewBtn')}</button>
+    </div>
+    ${active.length ? `<div class="card span-2"><h2>${t('tripsActive')}</h2><div class="goal-list">${active.map(tripCard).join('')}</div></div>` : ''}
+    ${done.length ? `<div class="card span-2"><h2>${t('tripsDone')}</h2><div class="goal-list">${done.map(tripCard).join('')}</div></div>` : ''}
+    ${!state.trips.length ? `<div class="card span-2"><div class="empty">${t('tripsEmpty')}</div></div>` : ''}`;
+}
+
+function renderTrip(tr) {
+  const spent = tripSpent(tr);
+  const left = tr.budget - spent;
+  const lvl = tr.budget > 0 ? goalLevel(spent, tr.budget) : 0;
+  const cls = ['', 'warn', 'over'][lvl];
+
+  // ό,τι έχει ήδη γραφτεί στη φόρμα μένει (π.χ. όταν αλλάζεις γλώσσα στη μέση)
+  const keep = { amount: $('#trip-amount')?.value || '', note: $('#trip-note')?.value || '', date: $('#trip-date')?.value || '' };
+
+  const cats = {};
+  tr.expenses.forEach((e) => { cats[e.cat] = (cats[e.cat] || 0) + e.amount; });
+  const slices = Object.entries(cats).map(([id, value]) => ({ ...tripCat(id), value })).sort((a, b) => b.value - a.value);
+
+  let rows = '', lastDay = '';
+  [...tr.expenses].sort((a, b) => b.date.localeCompare(a.date) || b.created - a.created).forEach((e) => {
+    if (e.date !== lastDay) { rows += `<div class="day-head">${dayLabel(e.date)}</div>`; lastDay = e.date; }
+    const c = tripCat(e.cat);
+    rows += `<button class="row" data-action="trip-exp-edit" data-id="${e.id}">
+      ${dot(c.color)}
+      <span class="name">${esc(e.note || L.tripCats[c.id])}${e.note ? `<small>${esc(L.tripCats[c.id])}</small>` : ''}</span>
+      <span class="amt">${money(e.amount)}</span></button>`;
+  });
+
+  $('#page-trips').innerHTML = `
+    <div class="card hero span-2">
+      <div class="trip-head">
+        <button class="link-btn" data-action="trip-back">${t('tripBack')}</button>
+        <button class="link-btn" data-action="trip-edit">${t('edit')}</button>
+      </div>
+      <h2 class="trip-dest">${esc(tr.dest)}${tr.done ? ` <span class="status done">${t('tripDoneLabel')}</span>` : ''}</h2>
+      <div class="hero-label">${t('tripLeft')}</div>
+      <div class="hero-amount ${left < 0 ? 'neg' : ''}">${money(left)}</div>
+      <div class="bar ${cls}"><i style="width:${tr.budget > 0 ? Math.min(100, (spent / tr.budget) * 100) : 0}%"></i></div>
+      <div class="hero-sub">${t('spentOf', money(spent), money(tr.budget))}</div>
+      <div class="btn-row">
+        <button class="btn" data-action="trip-finish">${tr.done ? t('tripReopen') : t('tripFinish')}</button>
+      </div>
+    </div>
+    ${tr.done ? '' : `<div class="card">
+      <h2>${t('tripAddTitle')}</h2>
+      <input type="text" inputmode="decimal" id="trip-amount" class="big-money" placeholder="${t('amountPh')}" autocomplete="off">
+      <div class="cats">${TRIP_CATS.map((c) =>
+        `<button class="cat ${pickedTripCat === c.id ? 'active' : ''}" style="--c:${c.color}" data-action="trip-pick-cat" data-cat="${c.id}">
+          ${dot(c.color)}${esc(L.tripCats[c.id])}</button>`).join('')}</div>
+      <div class="two-col">
+        <input type="text" id="trip-note" placeholder="${t('note')}" maxlength="60">
+        <input type="date" id="trip-date" value="${todayISO()}">
+      </div>
+      <button class="btn primary wide" data-action="trip-add">${t('addExpense')}</button>
+    </div>`}
+    ${slices.length ? `<div class="card">
+      <h2>${t('tripByCat')}</h2>
+      <div class="chart-wrap">
+        <div class="donut-box">${donutSVG(slices, spent)}
+          <div class="donut-center"><small class="muted">${t('total')}</small><b>${money(spent)}</b></div></div>
+        <div class="legend list">${slices.map((s) => `
+          <div class="row">${dot(s.color)}<span class="name">${esc(L.tripCats[s.id])}</span>
+            <span class="amt">${money(s.value)}</span><span class="pct">${pctOf(s.value, spent)}%</span></div>`).join('')}</div>
+      </div>
+    </div>` : ''}
+    <div class="card span-2">
+      <div class="card-head"><h2>${t('tripExpenses')}</h2><small class="muted">${t('tripCount', tr.expenses.length)}</small></div>
+      ${rows ? `<div class="list">${rows}</div>` : `<div class="empty">${t('nothingYet')}</div>`}
+    </div>`;
+
+  if ($('#trip-amount')) {
+    $('#trip-amount').value = keep.amount;
+    $('#trip-note').value = keep.note;
+    if (keep.date) $('#trip-date').value = keep.date;
+  }
+}
+
+// Ειδοποίηση όταν τα έξοδα του ταξιδιού περνούν το 80% ή το 100% των χρημάτων
+function tripAlert(tr, before) {
+  if (!(tr.budget > 0)) return null;
+  const after = tripSpent(tr);
+  const lvl = goalLevel(after, tr.budget);
+  if (lvl <= goalLevel(before, tr.budget)) return null;
+  const msg = lvl === 2 ? t('trip100', tr.dest, money(after - tr.budget)) : t('trip80', tr.dest, money(after), money(tr.budget));
+  notify(t('tabTrips'), msg, 'trip-' + tr.id);
+  return msg;
+}
+
+function tripForm(tr) {
+  openForm({
+    title: tr ? t('tripTitle') : t('tripNew'),
+    fields: [
+      { name: 'dest', label: t('tripDest'), value: tr?.dest, placeholder: t('egDest') },
+      { name: 'budget', label: t('tripBudget'), type: 'money', value: tr?.budget, placeholder: t('egGoal') },
+    ],
+    onSubmit(d) {
+      if (!d.dest) return t('errName');
+      if (!(d.budget > 0)) return t('errAmount');
+      if (tr) Object.assign(tr, { dest: d.dest, budget: d.budget });
+      else {
+        const n = { id: uid(), dest: d.dest, budget: d.budget, created: Date.now(), done: false, expenses: [] };
+        state.trips.push(n);
+        openTripId = n.id;   // ανοίγει αμέσως για να γράψει έξοδα
+        pickedTripCat = null;
+      }
+    },
+    deleteConfirm: tr ? t('tripConfirmDelete', tr.expenses.length) : null,
+    onDelete: tr ? () => { state.trips = state.trips.filter((x) => x !== tr); openTripId = null; } : null,
+  });
+}
+
+function addTripExpense() {
+  const tr = state.trips.find((x) => x.id === openTripId);
+  if (!tr) return;
+  const amtEl = $('#trip-amount');
+  const amount = parseMoney(amtEl.value);
+  if (!(amount > 0)) { toast(t('enterSpent')); amtEl.focus(); return; }
+  if (!pickedTripCat) { toast(t('pickCat')); return; }
+  const before = tripSpent(tr);
+  const cat = pickedTripCat;
+  tr.expenses.push({ id: uid(), date: $('#trip-date').value || todayISO(), amount, cat, note: $('#trip-note').value.trim(), created: Date.now() });
+  pickedTripCat = null;
+  amtEl.value = ''; $('#trip-note').value = '';
+  save(); renderTrips();
+  const alert = tripAlert(tr, before);
+  if (alert) toast(alert, true);
+  else toast(t('expenseAdded', money(amount), L.tripCats[cat]));
+  $('#trip-amount')?.focus();
+}
+
+function tripExpenseForm(tr, e) {
+  openForm({
+    title: t('expenseTitle'),
+    fields: [
+      { name: 'amount', label: t('amount'), type: 'money', value: e.amount },
+      { name: 'cat', label: t('category'), type: 'select', value: e.cat, options: TRIP_CATS.map((c) => ({ value: c.id, label: L.tripCats[c.id] })) },
+      { name: 'note', label: t('note'), value: e.note },
+      { name: 'date', label: t('date'), type: 'date', value: e.date },
+    ],
+    onSubmit(d) {
+      if (!(d.amount > 0)) return t('errAmount');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date)) return t('errDate');
+      const before = tripSpent(tr) - e.amount;
+      Object.assign(e, d);
+      const alert = tripAlert(tr, before);
+      if (alert) setTimeout(() => toast(alert, true), 0);
+    },
+    onDelete: () => { tr.expenses = tr.expenses.filter((x) => x !== e); },
+  });
+}
+
 /* ---------- Σελίδα: Αποταμιεύσεις ---------- */
 
 function renderPockets() {
@@ -1113,6 +1321,7 @@ function render() {
   renderPockets();
   renderGoals();
   renderExpenses();
+  renderTrips();
   updateBadges();
 }
 
@@ -1228,6 +1437,26 @@ const actions = {
   'toggle-lang'() { setLang(lang === 'el' ? 'en' : 'el'); },
   'toggle-group'() { setGroupOpen(!groupOpen); },
 
+  'trip-new'() { tripForm(null); },
+  'trip-open'(d) { openTripId = d.id; pickedTripCat = null; renderTrips(); window.scrollTo(0, 0); },
+  'trip-back'() { openTripId = null; renderTrips(); window.scrollTo(0, 0); },
+  'trip-edit'() { tripForm(state.trips.find((x) => x.id === openTripId)); },
+  'trip-finish'() {
+    const tr = state.trips.find((x) => x.id === openTripId);
+    tr.done = !tr.done;
+    save(); renderTrips();
+  },
+  'trip-pick-cat'(d, el) {
+    pickedTripCat = d.cat;
+    el.parentElement.querySelectorAll('.cat').forEach((b) => b.classList.toggle('active', b === el));
+    const amt = $('#trip-amount');
+    if (!amt.value) amt.focus();
+  },
+  'trip-add'() { addTripExpense(); },
+  'trip-exp-edit'(d) {
+    const tr = state.trips.find((x) => x.id === openTripId);
+    tripExpenseForm(tr, tr.expenses.find((e) => e.id === d.id));
+  },
   'goal-edit'(d) { goalForm(d.cat); },
   'goal-custom'() { goalCustomForm(); },
   'rec-add'(d) { recForm(null, d.type); },
@@ -1523,6 +1752,7 @@ document.addEventListener('input', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   if (e.target.id === 'exp-amount' || e.target.id === 'exp-note') { e.preventDefault(); addExpense(); }
+  else if (e.target.id === 'trip-amount' || e.target.id === 'trip-note') { e.preventDefault(); addTripExpense(); }
   else if (e.target.dataset && e.target.dataset.month) {
     // Enter σε έναν μήνα → πάει στον επόμενο
     e.preventDefault();

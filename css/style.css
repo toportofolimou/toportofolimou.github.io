@@ -289,6 +289,30 @@ input:focus, select:focus { outline: 2px solid var(--brand); outline-offset: 0; 
 .chip .dot { display: inline-block; width: 10px; height: 10px; margin-right: 2px; vertical-align: 0; }
 #toast.warn { background: #8a5a00; }
 
+/* ---------- Ταξίδια ---------- */
+.trip-card {
+  display: block; width: 100%; text-align: left; background: none; border: 0;
+  padding: 12px 6px; border-radius: 12px; border-bottom: 1px solid var(--line);
+}
+.trip-card:last-child { border-bottom: 0; }
+.trip-card:hover { background: var(--bg); }
+.trip-card .name { display: flex; flex-direction: column; }
+.trip-card .name small { font-size: .82rem; font-weight: normal; }
+.trip-head { display: flex; justify-content: space-between; margin: -6px -4px 4px; }
+.trip-dest { font-size: 1.5rem; margin: 2px 0 10px; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.trip-dest .status { font-size: .8rem; }
+
+/* Μεγάλο όνομα στο πλαϊνό μενού, σύντομο στη μπάρα του κινητού */
+.tab-short { display: none; }
+@media (max-width: 819px) {
+  .tab-long { display: none; }
+  .tab-short { display: inline; }
+  /* «Καταχώρηση προϋπολογισμού» στη μπάρα του κινητού: λίγο μικρότερο για να χωράει με το βελάκι */
+  .group-btn { padding-left: 2px; padding-right: 2px; gap: 2px; }
+  .group-label { font-size: .74rem; }
+  .group-btn .chev { width: 14px; height: 14px; }
+}
+
 /* ---------- Αποταμιεύσεις ---------- */
 .pocket-head { display: flex; align-items: center; gap: 12px; }
 .pocket-head > div { flex: 1; }
@@ -319,7 +343,7 @@ input:focus, select:focus { outline: 2px solid var(--brand); outline-offset: 0; 
 .chev { flex: none; transition: transform .2s; }
 
 /* Ομάδα «Καταχώρηση προϋπολογισμού» — στο κινητό ανοίγει σαν μενού προς τα πάνω */
-.tab-group { position: relative; display: flex; flex-grow: 1.45; }  /* το μεγάλο όνομα θέλει λίγο παραπάνω χώρο */
+.tab-group { position: relative; display: flex; flex-grow: 1.7; }   /* το μεγάλο όνομα θέλει λίγο παραπάνω χώρο */
 .group-label { min-width: 0; }
 .chev { transform: rotate(180deg); }                 /* βελάκι προς τα πάνω */
 .tab-group.open .chev { transform: rotate(0deg); }
