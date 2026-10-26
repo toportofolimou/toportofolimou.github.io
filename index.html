@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Τα λεφτά μου</title>
+<meta name="description" content="Απλό εργαλείο για νέους: μισθός, πάγια έξοδα, επαναλαμβανόμενες πληρωμές, αποταμιεύσεις και καθημερινά έξοδα.">
+<meta name="theme-color" content="#31575C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Τα λεφτά μου">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand-wrap">
+    <img class="brand" src="icons/logo-header.png" alt="Το πορτοφόλι μου" width="544" height="111">
+    <button class="lang-btn" id="lang-btn" data-action="toggle-lang">EN</button>
+  </div>
+  <div class="month-nav">
+    <button class="icon-btn" data-action="prev-month" aria-label="Προηγούμενος μήνας">‹</button>
+    <span id="month-label"></span>
+    <button class="icon-btn" data-action="next-month" aria-label="Επόμενος μήνας">›</button>
+  </div>
+</header>
+
+<main>
+  <section id="page-income" class="page"></section>
+  <section id="page-budget" class="page" hidden></section>
+  <section id="page-recurring" class="page" hidden></section>
+  <section id="page-pockets" class="page" hidden></section>
+  <section id="page-goals" class="page" hidden></section>
+  <section id="page-expenses" class="page" hidden></section>
+</main>
+
+<nav class="tabs">
+  <div class="tab-group">
+    <button class="group-btn" data-action="toggle-group" aria-expanded="false">
+      <span class="group-label">Καταχώρηση προϋπολογισμού</span>
+      <svg class="chev" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="group-items">
+      <button data-tab="income" class="active">Μισθοδοσία - Πάγια έξοδα</button>
+      <button data-tab="recurring">Επαναλαμβανόμενες πληρωμές</button>
+      <button data-tab="pockets">Αποταμιεύσεις</button>
+      <button data-tab="goals">Στόχοι εξόδων</button>
+    </div>
+  </div>
+  <button data-tab="budget">Ο μήνας μου</button>
+  <button data-tab="expenses">Μηνιαία έξοδα</button>
+</nav>
+
+<dialog id="dlg"><form id="dlg-form" novalidate></form></dialog>
+<input type="file" id="import-file" accept=".json,application/json" hidden>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/i18n.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
