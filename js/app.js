@@ -1844,6 +1844,13 @@ showTab(isNewUser ? 'income' : 'budget');
 
 // Λειτουργία χωρίς internet & εγκατάσταση (μόνο όταν η σελίδα ανοίγει από διεύθυνση web)
 if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
+  // Όταν έρθει νέα έκδοση ενώ η εφαρμογή είναι ανοιχτή, ξαναφορτώνει μία φορά για να φανεί αμέσως
+  // (όχι την πρώτη φορά που εγκαθίσταται, όταν δεν υπήρχε προηγούμενη έκδοση)
+  const hadVersion = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadVersion && !reloaded && !$('#dlg').open) { reloaded = true; location.reload(); }
+  });
   navigator.serviceWorker.register('sw.js').catch(() => { /* συνεχίζει και χωρίς */ });
 }
 window.addEventListener('beforeinstallprompt', (e) => {

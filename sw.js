@@ -1,7 +1,7 @@
 // Service worker: η εφαρμογή ανοίγει και χωρίς internet.
-// Δίνει αμέσως ό,τι έχει αποθηκευμένο και φέρνει στο παρασκήνιο τη νέα έκδοση
-// (φαίνεται στο επόμενο άνοιγμα). Άλλαξε το CACHE όταν προστεθούν/αφαιρεθούν αρχεία.
-const CACHE = 'ta-lefta-mou-v8';
+// Με internet φέρνει πάντα την πιο νέα έκδοση (και την κρατά αποθηκευμένη)·
+// χωρίς internet δίνει την αποθηκευμένη. Άλλαξε το CACHE όταν προστεθούν/αφαιρεθούν αρχεία.
+const CACHE = 'ta-lefta-mou-v9';
 const FILES = [
   './',
   './index.html',
@@ -42,11 +42,15 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
     caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(e.request, { ignoreSearch: true });
-      const fresh = fetch(e.request)
-        .then((res) => { if (res.ok) cache.put(e.request, res.clone()); return res; })
-        .catch(() => cached);
-      return cached || fresh;
+      try {
+        const res = await fetch(e.request, { cache: 'no-cache' });
+        if (res.ok) cache.put(e.request, res.clone());
+        return res;
+      } catch (err) {
+        const cached = await cache.match(e.request, { ignoreSearch: true });
+        if (cached) return cached;
+        throw err;
+      }
     })
   );
 });

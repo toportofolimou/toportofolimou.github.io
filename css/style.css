@@ -14,22 +14,8 @@
   --radius: 16px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111817;
-    --card: #1b2523;
-    --text: #e8efed;
-    --muted: #93a39f;
-    --line: #2b3734;
-    --brand: #9cc3c7;   /* ανοιχτή απόχρωση του #31575C για να διαβάζεται σε σκούρο φόντο */
-    --brand-soft: #1d3a35;
-    --brand-bg: #31575C;
-    --good: #4fcf8e;
-    --bad: #ff7a66;
-    --bad-soft: #3a2420;
-    --shadow: none;
-  }
-}
+/* Η εφαρμογή έχει πάντα φωτεινά χρώματα, ακόμα κι αν το κινητό είναι σε σκοτεινή λειτουργία */
+:root { color-scheme: light; }
 
 * { box-sizing: border-box; }
 
@@ -257,7 +243,6 @@ input:focus, select:focus { outline: 2px solid var(--brand); outline-offset: 0; 
 .status.soon { background: #fdf0d5; color: #8a5a00; }
 .status.over { background: var(--bad-soft); color: var(--bad); }
 .status.done { background: var(--brand-soft); color: var(--brand); }
-@media (prefers-color-scheme: dark) { .status.soon { background: #3d3115; color: #f5c46b; } }
 .reminders { border-color: #e9a03b; }
 .check-field { display: flex; align-items: flex-start; gap: 10px; margin: 4px 0 14px; font-size: .95rem; cursor: pointer; }
 .check-field input { width: 20px; height: 20px; flex: none; margin: 1px 0 0; accent-color: var(--brand); }
@@ -285,7 +270,6 @@ input:focus, select:focus { outline: 2px solid var(--brand); outline-offset: 0; 
 .goal-bottom.over { color: var(--bad); font-weight: 700; }
 .bar.warn i { background: #e9a03b; }
 .bar.over i { background: var(--bad); }
-@media (prefers-color-scheme: dark) { .goal-bottom.warn { color: #f5c46b; } }
 .chip .dot { display: inline-block; width: 10px; height: 10px; margin-right: 2px; vertical-align: 0; }
 #toast.warn { background: #8a5a00; }
 
