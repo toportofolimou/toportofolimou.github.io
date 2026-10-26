@@ -39,6 +39,7 @@ input, select { font-size: max(16px, 1em); }
 h2 { font-size: 1.05rem; margin: 0 0 12px; }
 h3 { font-size: 1rem; margin: 0; }
 small, .muted { color: var(--muted); }
+.nowrap { white-space: nowrap; }
 
 /* ---------- Κεφαλίδα ---------- */
 .top {

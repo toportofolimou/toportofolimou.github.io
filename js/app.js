@@ -234,13 +234,13 @@ let cur = monthKey(new Date());
 let pickedCat = null;       // κατηγορία στη γρήγορη καταχώρηση
 let filterCat = null;       // φίλτρο λίστας εξόδων από το γράφημα
 let showFixedInChart = false;
-let editCats = false;
+let editCats = false;       // «Οι κατηγορίες μου»: πατώντας μια δική σου κατηγορία την αλλάζεις
 // Ιστορικό & αναζήτηση
 let expView = 'month';      // 'month' ή 'history'
 let histPeriod = 3;         // μήνες: 1, 3, 6, 12
 let histQuery = '';
 let histFrom = '', histTo = '';
-let histLimit = 50;         // πόσα έξοδα φαίνονται στη λίστα πριν το «Δείξε περισσότερα»       // «Οι κατηγορίες μου»: πατώντας μια δική σου κατηγορία την αλλάζεις
+let histLimit = 50;         // πόσα έξοδα φαίνονται στη λίστα πριν το «Δείξε περισσότερα»
 let incomeYear = null;      // χρονιά στον πίνακα μηνών του μισθού (null = η χρονιά του μήνα που βλέπουμε)
 
 const allCats = () => [...CATS, ...state.customCats];
@@ -254,7 +254,9 @@ function incomeFor(key) {
   return v === undefined ? null : v;
 }
 const fixedTotal = () => sum(state.fixed, (f) => f.amount);
-const savingsPlan = () => sum(state.pockets, (p) => p.monthly || 0);
+// Όταν μια αποταμίευση φτάσει τον στόχο της, δεν χρειάζεται να μπαίνουν άλλα λεφτά κάθε μήνα
+const pocketGoalReached = (p) => p.goal > 0 && pocketBalance(p) >= p.goal;
+const savingsPlan = () => sum(state.pockets, (p) => (pocketGoalReached(p) ? 0 : p.monthly || 0));
 const monthExpenses = (key) => state.expenses.filter((e) => e.date.startsWith(key));
 const pocketBalance = (p) => round2(sum(p.tx, (x) => x.amount));
 
@@ -355,7 +357,7 @@ function renderBudget() {
     </div>`;
   }
 
-  const pocketRows = state.pockets.filter((p) => p.monthly > 0).map((p) =>
+  const pocketRows = state.pockets.filter((p) => p.monthly > 0 && !pocketGoalReached(p)).map((p) =>
     `<div class="row">${dot(pocketColor(p))}<span class="name">${esc(p.name)}</span>
       <span class="amt">${money(p.monthly)}</span></div>`).join('');
 
@@ -678,7 +680,8 @@ function icsEvent(r) {
     `DTSTART;VALUE=DATE:${start}`,
     `DTEND;VALUE=DATE:${end}`,
     `SUMMARY:${icsText(title)}`,
-    `RRULE:FREQ=MONTHLY;INTERVAL=${r.every}${r.left ? ';COUNT=' + r.left : ''}`,
+    // Μέρες 29–31: σε μικρότερους μήνες πέφτει την τελευταία μέρα (αλλιώς το ημερολόγιο θα τους παρέλειπε)
+    `RRULE:FREQ=MONTHLY;INTERVAL=${r.every}${r.day > 28 ? ';BYMONTHDAY=' + Array.from({ length: r.day - 27 }, (_, i) => 28 + i).join(',') + ';BYSETPOS=-1' : ''}${r.left ? ';COUNT=' + r.left : ''}`,
     'BEGIN:VALARM',
     'ACTION:DISPLAY',
     `DESCRIPTION:${icsText(t('notifHead') + ': ' + title)}`,
@@ -1124,7 +1127,7 @@ function renderPockets() {
     else if (p.goal > 0) info = t('remaining', money(remaining));
 
     const deposited = p.tx.some((x) => x.plan === cur);
-    const planBtn = p.monthly > 0
+    const planBtn = p.monthly > 0 && !pocketGoalReached(p)
       ? (deposited
         ? `<div class="done">${esc(t('depositedFor', money(p.monthly), ofMonth(cur)))}</div>`
         : `<div class="btn-row"><button class="btn primary" data-action="pocket-plan" data-id="${p.id}">${esc(t('depositFor', money(p.monthly), ofMonth(cur)))}</button></div>`)
@@ -1134,7 +1137,7 @@ function renderPockets() {
       <div class="pocket-head">
         ${avatar(p)}
         <div><h3>${esc(p.name)}</h3>
-          <small>${p.goal > 0 ? t('goal', money(p.goal)) : t('noGoal')}${p.monthly > 0 ? ' · ' + money(p.monthly) + t('perMonth') : ''}</small></div>
+          <small>${p.goal > 0 ? t('goal', money(p.goal)) : t('noGoal')}${p.monthly > 0 ? ` · <span class="nowrap">${money(p.monthly)}${t('perMonth')}</span>` : ''}</small></div>
         <button class="link-btn" data-action="edit-pocket" data-id="${p.id}">${t('edit')}</button>
       </div>
       <div class="pocket-amount">${money(bal)}${p.goal > 0 ? ` <small class="muted">/ ${money(p.goal)}</small>` : ''}</div>
@@ -1226,7 +1229,7 @@ function renderExpenses() {
             ${dot(s.color)}
             <span class="name">${esc(catName(s.id))}</span>
             <span class="amt">${money(s.value)}</span>
-            <span class="pct">${Math.round((s.value / total) * 100)}%</span>
+            <span class="pct">${pctOf(s.value, total)}%</span>
           </button>`).join('')}
         </div>
       </div>`
@@ -1389,7 +1392,7 @@ function renderHistoryResults() {
             <button class="row" data-action="hist-cat" data-cat="${s.id}">
               ${dot(s.color)}<span class="name">${esc(catName(s.id))}</span>
               <span class="amt">${money(s.value)}</span>
-              <span class="pct">${Math.round((s.value / total) * 100)}%</span>
+              <span class="pct">${pctOf(s.value, total)}%</span>
             </button>`).join('')}</div>
         </div>
       </div>`;
@@ -1679,7 +1682,9 @@ const actions = {
   },
   'reset'() {
     if (!confirm(t('confirmReset'))) return;
-    state = emptyState(); save(); render();
+    state = emptyState();
+    openTripId = null; pickedCat = null; pickedTripCat = null; filterCat = null; editCats = false; editTripCats = false;
+    save(); render();
     toast(t('resetDone'));
   },
 };
@@ -1910,7 +1915,7 @@ $('#import-file').addEventListener('change', async (e) => {
     if (!data || !data.income || !Array.isArray(data.expenses)) throw new Error('bad');
     if (!confirm(t('confirmImport'))) return;
     state = normalize(data);
-    openTripId = null; pickedCat = null; pickedTripCat = null; filterCat = null;
+    openTripId = null; pickedCat = null; pickedTripCat = null; filterCat = null; editCats = false; editTripCats = false;
     save(); render();
     toast(t('importDone'));
   } catch (err) {
