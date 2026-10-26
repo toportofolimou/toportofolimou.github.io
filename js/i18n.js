@@ -28,7 +28,7 @@ const I18N = {
       car: 'Αυτοκίνητο', studies: 'Σπουδές', gifts: 'Δώρα', tech: 'Τεχνολογία',
     },
 
-    appName: 'Τα λεφτά μου',
+    appName: 'Το πορτοφόλι μου',
     otherLang: 'EN',
     otherLangLabel: 'Switch to English',
     prevMonth: 'Προηγούμενος μήνας',
@@ -317,7 +317,7 @@ const I18N = {
       car: 'Car', studies: 'Studies', gifts: 'Gifts', tech: 'Tech',
     },
 
-    appName: 'My Money',
+    appName: 'My Wallet',
     otherLang: 'ΕΛ',
     otherLangLabel: 'Αλλαγή σε Ελληνικά',
     prevMonth: 'Previous month',

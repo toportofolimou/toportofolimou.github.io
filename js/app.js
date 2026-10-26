@@ -1,7 +1,7 @@
 'use strict';
 
 /* =========================================================
-   Τα λεφτά μου — απλό εργαλείο διαχείρισης χρημάτων για νέους.
+   Το πορτοφόλι μου — απλό εργαλείο διαχείρισης χρημάτων για νέους.
    Όλα τα δεδομένα μένουν στη συσκευή (localStorage).
    Τα κείμενα (Ελληνικά / Αγγλικά) είναι στο js/i18n.js.
    ========================================================= */
@@ -615,7 +615,7 @@ function icsEvent(r) {
   ].join('\r\n');
 }
 function downloadIcs(items, filename) {
-  const body = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ta lefta mou//EL', 'CALSCALE:GREGORIAN',
+  const body = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//To portofoli mou//EL', 'CALSCALE:GREGORIAN',
     ...items.map(icsEvent), 'END:VCALENDAR'].join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([body], { type: 'text/calendar;charset=utf-8' }));
@@ -1576,7 +1576,7 @@ const actions = {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `ta-lefta-mou-${todayISO()}.json`;
+    a.download = `to-portofoli-mou-${todayISO()}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     toast(t('backupSaved'));
