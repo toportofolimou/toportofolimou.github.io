@@ -1,7 +1,7 @@
 // Service worker: η εφαρμογή ανοίγει και χωρίς internet.
 // Με internet φέρνει πάντα την πιο νέα έκδοση (και την κρατά αποθηκευμένη)·
 // χωρίς internet δίνει την αποθηκευμένη. Άλλαξε το CACHE όταν προστεθούν/αφαιρεθούν αρχεία.
-const CACHE = 'ta-lefta-mou-v9';
+const CACHE = 'ta-lefta-mou-v10';
 const FILES = [
   './',
   './index.html',

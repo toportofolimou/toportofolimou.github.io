@@ -265,20 +265,48 @@ const isStandalone = () => matchMedia('(display-mode: standalone)').matches || n
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) ||
   (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1); // iPadOS
 
-function installCard() {
-  if (isStandalone() || !/^https?:/.test(location.protocol)) return '';
-  try { if (localStorage.getItem(INSTALL_KEY)) return ''; } catch (e) { /* δεν πειράζει */ }
-  let body;
-  if (installPrompt) {
-    body = `<p>${t('installText')}</p>
-      <div class="btn-row"><button class="btn primary" data-action="install">${t('installBtn')}</button>
-      <button class="btn" data-action="install-hide">${t('notNow')}</button></div>`;
-  } else if (isIOS()) {
-    body = `<p>${t('iosText')}</p>
-      <ol><li>${t('iosStep1')}</li><li>${t('iosStep2')}</li></ol>
-      <div class="btn-row"><button class="btn" data-action="install-hide">${t('ok')}</button></div>`;
-  } else return '';
-  return `<div class="card install"><h2>${t('installTitle')}</h2>${body}</div>`;
+// Άνοιξε τη σελίδα μέσα από Instagram/Facebook/TikTok κ.λπ.; Από εκεί δεν γίνεται εγκατάσταση
+const isInApp = () => /Instagram|FBAN|FBAV|FB_IAB|Messenger|Line\/|TikTok|musical_ly|Snapchat|Twitter/i.test(navigator.userAgent);
+const SHARE_ICON = `<svg class="share-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4M6 11H5v10h14V11h-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+// Αν πατήσει «Όχι τώρα», η λωρίδα ξαναεμφανίζεται μετά από μία εβδομάδα
+function installHidden() {
+  try { const v = Number(localStorage.getItem(INSTALL_KEY)); return v > 0 && Date.now() - v < 7 * 864e5; } catch (e) { return false; }
+}
+
+// Λωρίδα «Κατέβασέ με!» κάτω από την πάνω μπάρα, σε όλες τις σελίδες, μέχρι να εγκατασταθεί
+function renderInstallBar() {
+  const bar = $('#install-bar');
+  const show = !isStandalone() && /^https?:/.test(location.protocol) && !installHidden();
+  bar.hidden = !show;
+  if (!show) return;
+  bar.innerHTML = `<div class="install-inner">
+      <img src="icons/icon-192.png" alt="" class="install-icon" width="40" height="40">
+      <div class="install-text"><b>${t('installTitle')}</b><small>${t('installSub')}</small></div>
+      <button class="btn primary install-go" data-action="install">${t('installBtn')}</button>
+      <button class="install-close" data-action="install-hide" aria-label="${t('notNow')}" title="${t('notNow')}">×</button>
+    </div>`;
+}
+
+// Παράθυρο μόνο με πληροφορίες (π.χ. τα βήματα για iPhone)
+function openInfo(title, html) {
+  const dlg = $('#dlg');
+  const form = $('#dlg-form');
+  form.innerHTML = `<h2>${esc(title)}</h2>${html}
+    <div class="dlg-actions"><span class="spacer"></span><button type="submit" class="btn primary">${t('ok')}</button></div>`;
+  form.onclick = null;
+  form.onsubmit = (e) => { e.preventDefault(); dlg.close(); };
+  dlg.showModal();
+}
+
+function showInstallHelp() {
+  let html;
+  if (isInApp()) html = `<p>${t('inAppHelp')}</p>`;
+  else if (isIOS()) {
+    html = `<p>${t('iosIntro')}</p>
+      <ol class="install-steps"><li>${t('iosStep1', SHARE_ICON)}</li><li>${t('iosStep2')}</li><li>${t('iosStep3')}</li></ol>`;
+  } else html = `<p>${t('androidHelp')}</p>`;
+  openInfo(t('installHelpTitle'), html);
 }
 
 /* ---------- Σελίδα: Ο μήνας μου ---------- */
@@ -332,7 +360,6 @@ function renderBudget() {
       <span class="amt">${money(p.monthly)}</span></div>`).join('');
 
   $('#page-budget').innerHTML = `
-    ${installCard()}
     ${remindersCard()}
     ${goalsWarnCard()}
     ${hero}
@@ -1362,6 +1389,7 @@ function renderHistoryResults() {
 function render() {
   // πλήρες όνομα μήνα, και σύντομο για μικρές οθόνες κινητού (το διαλέγει το CSS)
   $('#month-label').innerHTML = `<span class="m-long">${esc(monthName(cur))}</span><span class="m-short">${esc(shortMonth(cur))}</span>`;
+  renderInstallBar();
   renderBudget();
   renderIncome();
   renderRecurring();
@@ -1582,16 +1610,18 @@ const actions = {
     toast(t('backupSaved'));
   },
   'import'() { $('#import-file').click(); },
+  // «Κατέβασέ με!»: στο Android βγάζει κατευθείαν την εγκατάσταση· στο iPhone δείχνει τα βήματα
   async 'install'() {
-    if (!installPrompt) return;
+    if (!installPrompt) { showInstallHelp(); return; }
     installPrompt.prompt();
-    await installPrompt.userChoice;
+    const choice = await installPrompt.userChoice;
     installPrompt = null;
-    renderBudget();
+    if (choice && choice.outcome === 'accepted') toast(t('installDone'));
+    renderInstallBar();
   },
   'install-hide'() {
-    try { localStorage.setItem(INSTALL_KEY, '1'); } catch (e) { /* δεν πειράζει */ }
-    renderBudget();
+    try { localStorage.setItem(INSTALL_KEY, String(Date.now())); } catch (e) { /* δεν πειράζει */ }
+    renderInstallBar();
   },
   'reset'() {
     if (!confirm(t('confirmReset'))) return;
@@ -1854,11 +1884,15 @@ if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
   navigator.serviceWorker.register('sw.js').catch(() => { /* συνεχίζει και χωρίς */ });
 }
 window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
+  e.preventDefault();   // κρατάμε το παράθυρο εγκατάστασης για όταν πατηθεί το «Κατέβασέ με!»
   installPrompt = e;
-  renderBudget();
+  renderInstallBar();
 });
-window.addEventListener('appinstalled', () => { installPrompt = null; renderBudget(); });
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  try { localStorage.setItem(INSTALL_KEY, String(Date.now() + 3650 * 864e5)); } catch (e) { /* δεν πειράζει */ }
+  renderInstallBar();
+});
 // Υπενθυμίσεις πληρωμών: με το άνοιγμα, όταν ξαναγυρνάς στην εφαρμογή, και κάθε ώρα όσο είναι ανοιχτή
 checkNotifications();
 setInterval(() => { checkNotifications(); updateBadges(); }, 60 * 60 * 1000);

@@ -370,11 +370,24 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* ---------- Κάρτα εγκατάστασης ---------- */
-.install { border-color: var(--brand); background: var(--brand-soft); }
-.install p { margin: 0 0 6px; }
-.install ol { margin: 6px 0 0; padding-left: 22px; }
-.install li { margin-bottom: 4px; }
+/* ---------- Λωρίδα «Κατέβασέ με!» ---------- */
+.install-bar[hidden] { display: none; }
+.install-bar { background: var(--brand-soft); border-bottom: 1px solid var(--line); }
+.install-inner {
+  max-width: 1040px; margin: 0 auto; display: flex; align-items: center; gap: 10px;
+  padding: 10px calc(12px + env(safe-area-inset-right)) 10px calc(16px + env(safe-area-inset-left));
+}
+.install-icon { width: 40px; height: 40px; border-radius: 10px; flex: none; }
+.install-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.install-text b { font-size: .95rem; }
+.install-text small { font-size: .8rem; }
+.install-go { flex: none; white-space: nowrap; padding: 10px 14px; }
+.install-close { flex: none; border: 0; background: none; font-size: 1.5rem; line-height: 1; color: var(--muted); width: 32px; height: 32px; border-radius: 50%; }
+.install-close:hover { background: rgba(0, 0, 0, .06); }
+@media (max-width: 400px) { .install-text small { display: none; } .install-icon { width: 34px; height: 34px; } }
+.install-steps { margin: 6px 0 4px; padding-left: 22px; }
+.install-steps li { margin-bottom: 10px; line-height: 1.45; }
+.share-icon { vertical-align: -4px; color: #0a84ff; }
 
 /* Το hover μόνο σε ποντίκι — στην αφή «κολλάει» */
 @media (hover: none) {
