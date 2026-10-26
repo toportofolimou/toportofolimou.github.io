@@ -372,13 +372,59 @@ function renderBudget() {
     </div>
     <div class="card">
       <h2>${t('backup')}</h2>
-      <p class="muted" style="margin:0 0 4px;font-size:.9rem">${t('backupText')}</p>
+      <p class="muted" style="margin:0 0 8px;font-size:.9rem">${t('backupText')}</p>
+      ${backupStatus()}
+      <div class="btn-row">
+        <button class="btn primary" data-action="share-backup">${t('shareBtn')}</button>
+        <button class="btn" data-action="import">${t('importBtn')}</button>
+      </div>
+      <details class="howto">
+        <summary>${t('moveTitle2')}</summary>
+        <ol>
+          <li>${t('moveStep1')}</li>
+          <li>${t('moveStep2', esc(appAddress()))}</li>
+          <li>${t('moveStep3')}</li>
+          <li>${t('moveStep4')}</li>
+        </ol>
+      </details>
       <div class="btn-row">
         <button class="btn small" data-action="export">${t('exportBtn')}</button>
-        <button class="btn small" data-action="import">${t('importBtn')}</button>
         <button class="btn small danger" data-action="reset">${t('resetBtn')}</button>
       </div>
     </div>`;
+}
+
+/* ---------- Αντίγραφο ασφαλείας ---------- */
+
+const BACKUP_KEY = 'ta-lefta-mou-last-backup';
+const appAddress = () => (/^https?:/.test(location.protocol) ? location.host + location.pathname.replace(/index\.html$/, '') : 'toportofolimou.github.io').replace(/\/$/, '');
+
+function markBackup() {
+  try { localStorage.setItem(BACKUP_KEY, String(Date.now())); } catch (e) { /* δεν πειράζει */ }
+}
+
+// Όλα τα στοιχεία (μισθός, πάγια, πληρωμές, αποταμιεύσεις, στόχοι, έξοδα, ταξίδια) σε ένα αρχείο
+function downloadBackup() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `to-portofoli-mou-${todayISO()}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  markBackup();
+  toast(t('backupSaved'));
+}
+
+// «Τελευταίο αντίγραφο: …» και υπενθύμιση αν πέρασε πάνω από μήνας (μόνο αν έχει γράψει κάτι)
+function backupStatus() {
+  let last = 0;
+  try { last = Number(localStorage.getItem(BACKUP_KEY)) || 0; } catch (e) { /* δεν πειράζει */ }
+  const hasData = state.expenses.length || state.fixed.length || state.pockets.length || state.recurring.length || state.trips.length;
+  if (!hasData) return '';
+  const days = last ? Math.floor((Date.now() - last) / 864e5) : null;
+  const when = days === null ? t('backupNever') : days === 0 ? t('backupToday') : t('backupDaysAgo', days);
+  const old = days === null || days > 30;
+  return `<div class="hint ${old ? 'warn' : ''}" style="margin:0 0 4px">${t('backupLast', when)}${old ? ' ' + t('backupRemind') : ''}</div>`;
 }
 
 /* ---------- Σελίδα: Μισθοδοσία - Πάγια έξοδα ---------- */
@@ -1600,14 +1646,22 @@ const actions = {
     renderExpenses();
   },
 
-  'export'() {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `to-portofoli-mou-${todayISO()}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    toast(t('backupSaved'));
+  'export'() { downloadBackup(); },
+  // «Στείλε το αντίγραφο»: ανοίγει το μενού Κοινοποίησης του κινητού (email, Drive, WhatsApp, AirDrop…)
+  async 'share-backup'() {
+    const json = JSON.stringify(state, null, 2);
+    const base = `to-portofoli-mou-${todayISO()}`;
+    // Το Chrome στο Android δεν στέλνει αρχεία .json, οπότε δοκιμάζουμε και ως .txt (το περιεχόμενο είναι ίδιο)
+    const files = [new File([json], base + '.json', { type: 'application/json' }), new File([json], base + '.txt', { type: 'text/plain' })];
+    const file = navigator.canShare ? files.find((f) => { try { return navigator.canShare({ files: [f] }); } catch (e) { return false; } }) : null;
+    if (!file) { downloadBackup(); return; }
+    try {
+      await navigator.share({ files: [file], title: t('appName'), text: t('shareText') });
+      markBackup();
+      toast(t('backupSaved'));
+    } catch (e) {
+      if (e && e.name !== 'AbortError') downloadBackup(); // αν το κινητό αρνηθεί, κατεβαίνει σαν αρχείο
+    }
   },
   'import'() { $('#import-file').click(); },
   // «Κατέβασέ με!»: στο Android βγάζει κατευθείαν την εγκατάσταση· στο iPhone δείχνει τα βήματα
@@ -1856,6 +1910,7 @@ $('#import-file').addEventListener('change', async (e) => {
     if (!data || !data.income || !Array.isArray(data.expenses)) throw new Error('bad');
     if (!confirm(t('confirmImport'))) return;
     state = normalize(data);
+    openTripId = null; pickedCat = null; pickedTripCat = null; filterCat = null;
     save(); render();
     toast(t('importDone'));
   } catch (err) {

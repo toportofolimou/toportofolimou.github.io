@@ -370,6 +370,12 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ---------- Αντίγραφο ασφαλείας: οδηγίες μεταφοράς ---------- */
+.howto { margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; background: var(--bg); }
+.howto summary { cursor: pointer; padding: 11px 0; font-weight: 600; color: var(--brand); list-style-position: inside; }
+.howto ol { margin: 0 0 12px; padding-left: 22px; font-size: .92rem; }
+.howto li { margin-bottom: 8px; line-height: 1.45; }
+
 /* ---------- Λωρίδα «Κατέβασέ με!» ---------- */
 .install-bar[hidden] { display: none; }
 .install-bar { background: var(--brand-soft); border-bottom: 1px solid var(--line); }
