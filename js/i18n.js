@@ -68,6 +68,7 @@ const I18N = {
     trip80: (dest, a, b) => `Προσοχή: ξόδεψες το 80% των χρημάτων για «${dest}» (${a} από ${b}).`,
     trip100: (dest, x) => `Ξεπέρασες τα χρήματα του ταξιδιού «${dest}» κατά ${x}.`,
     tripOver: (x) => `Ξεπέρασες κατά ${x}`,
+    egTripCat: 'π.χ. Βενζίνη',
 
     // Στόχοι εξόδων
     goalsLeftLabel: (inMonth) => `Σου μένουν από τους στόχους ${inMonth}`,
@@ -355,6 +356,7 @@ const I18N = {
     trip80: (dest, a, b) => `Heads up: you've spent 80% of your money for “${dest}” (${a} of ${b}).`,
     trip100: (dest, x) => `You've gone over your money for “${dest}” by ${x}.`,
     tripOver: (x) => `${x} over`,
+    egTripCat: 'e.g. Fuel',
 
     goalsLeftLabel: (inMonth) => `Left from your goals ${inMonth}`,
     goalsHint: 'Set how much you want to spend each month in each category. We\'ll let you know when you reach 80%.',

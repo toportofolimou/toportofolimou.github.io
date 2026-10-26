@@ -168,7 +168,7 @@ function toast(msg, warn = false) {
 /* ---------- Δεδομένα ---------- */
 
 function emptyState() {
-  return { income: { type: 'fixed', fixed: 0, monthly: {} }, fixed: [], recurring: [], pockets: [], expenses: [], customCats: [], goals: {}, trips: [] };
+  return { income: { type: 'fixed', fixed: 0, monthly: {} }, fixed: [], recurring: [], pockets: [], expenses: [], customCats: [], goals: {}, trips: [], tripCustomCats: [] };
 }
 // Καθαρίζει δεδομένα (από τη συσκευή ή από αρχείο) ώστε να μη σπάσει η εφαρμογή
 function normalize(data) {
@@ -190,11 +190,15 @@ function normalize(data) {
     left: r.left === null || r.left === undefined || r.left === '' ? null : Math.max(0, Math.floor(num(r.left))),
     fixedId: r.fixedId || null,
   }));
+  s.tripCustomCats = arr(data.tripCustomCats).filter((c) => c.id).map((c) => ({
+    id: String(c.id), name: String(c.name || ''), color: String(c.color || CAT_COLORS[0]),
+  }));
+  const tripCatIds = new Set([...TRIP_CATS, ...s.tripCustomCats].map((c) => c.id));
   s.trips = arr(data.trips).map((tr) => ({
     id: tr.id || uid(), dest: String(tr.dest || ''), budget: num(tr.budget), created: num(tr.created), done: !!tr.done,
     expenses: arr(tr.expenses).filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date)).map((e) => ({
       id: e.id || uid(), date: e.date, amount: num(e.amount),
-      cat: TRIP_CATS.some((c) => c.id === e.cat) ? e.cat : 'other', note: String(e.note || ''), created: num(e.created),
+      cat: tripCatIds.has(e.cat) ? e.cat : 'other', note: String(e.note || ''), created: num(e.created),
     })),
   }));
   if (data.goals && typeof data.goals === 'object') {
@@ -804,8 +808,15 @@ function checkGoalNotifications() {
 
 let openTripId = null;      // ποιο ταξίδι είναι ανοιχτό (null = λίστα ταξιδιών)
 let pickedTripCat = null;   // κατηγορία στη γρήγορη καταχώρηση εξόδου ταξιδιού
+let editTripCats = false;   // «Οι κατηγορίες μου» στα ταξίδια: πατώντας μια δική σου την αλλάζεις
 
-const tripCat = (id) => TRIP_CATS.find((c) => c.id === id) || TRIP_CATS[TRIP_CATS.length - 1];
+// Έτοιμες κατηγορίες ταξιδιού + όσες έφτιαξε ο χρήστης (κοινές για όλα τα ταξίδια)
+const allTripCats = () => [...TRIP_CATS, ...state.tripCustomCats];
+const tripCat = (id) => allTripCats().find((c) => c.id === id) || TRIP_CATS[TRIP_CATS.length - 1];
+function tripCatName(id) {
+  const custom = state.tripCustomCats.find((c) => c.id === id);
+  return custom ? custom.name : (L.tripCats[id] || L.tripCats.other);
+}
 const tripSpent = (tr) => round2(sum(tr.expenses, (e) => e.amount));
 
 function tripCard(tr) {
@@ -863,7 +874,7 @@ function renderTrip(tr) {
     const c = tripCat(e.cat);
     rows += `<button class="row" data-action="trip-exp-edit" data-id="${e.id}">
       ${dot(c.color)}
-      <span class="name">${esc(e.note || L.tripCats[c.id])}${e.note ? `<small>${esc(L.tripCats[c.id])}</small>` : ''}</span>
+      <span class="name">${esc(e.note || tripCatName(c.id))}${e.note ? `<small>${esc(tripCatName(c.id))}</small>` : ''}</span>
       <span class="amt">${money(e.amount)}</span></button>`;
   });
 
@@ -885,9 +896,14 @@ function renderTrip(tr) {
     ${tr.done ? '' : `<div class="card">
       <h2>${t('tripAddTitle')}</h2>
       <input type="text" inputmode="decimal" id="trip-amount" class="big-money" placeholder="${t('amountPh')}" autocomplete="off">
-      <div class="cats">${TRIP_CATS.map((c) =>
-        `<button class="cat ${pickedTripCat === c.id ? 'active' : ''}" style="--c:${c.color}" data-action="trip-pick-cat" data-cat="${c.id}">
-          ${dot(c.color)}${esc(L.tripCats[c.id])}</button>`).join('')}</div>
+      ${state.tripCustomCats.length ? `<div class="cats-head">
+        ${editTripCats ? `<small class="muted">${t('editCatsHint')}</small>` : '<span></span>'}
+        <button class="link-btn" data-action="trip-toggle-edit-cats">${editTripCats ? t('done') : t('myCats')}</button></div>` : ''}
+      <div class="cats ${editTripCats ? 'editing' : ''}">${allTripCats().map((c) => {
+        const custom = state.tripCustomCats.includes(c);
+        return `<button class="cat ${custom ? 'custom' : ''} ${pickedTripCat === c.id ? 'active' : ''}" style="--c:${c.color}" data-action="trip-pick-cat" data-cat="${c.id}">
+          ${dot(c.color)}${esc(tripCatName(c.id))}</button>`;
+      }).join('')}${editTripCats ? '' : `<button class="cat add-cat" data-action="trip-add-cat">${t('newCatBtn')}</button>`}</div>
       <div class="two-col">
         <input type="text" id="trip-note" placeholder="${t('note')}" maxlength="60">
         <input type="date" id="trip-date" value="${todayISO()}">
@@ -900,7 +916,7 @@ function renderTrip(tr) {
         <div class="donut-box">${donutSVG(slices, spent)}
           <div class="donut-center"><small class="muted">${t('total')}</small><b>${money(spent)}</b></div></div>
         <div class="legend list">${slices.map((s) => `
-          <div class="row">${dot(s.color)}<span class="name">${esc(L.tripCats[s.id])}</span>
+          <div class="row">${dot(s.color)}<span class="name">${esc(tripCatName(s.id))}</span>
             <span class="amt">${money(s.value)}</span><span class="pct">${pctOf(s.value, spent)}%</span></div>`).join('')}</div>
       </div>
     </div>` : ''}
@@ -965,8 +981,39 @@ function addTripExpense() {
   save(); renderTrips();
   const alert = tripAlert(tr, before);
   if (alert) toast(alert, true);
-  else toast(t('expenseAdded', money(amount), L.tripCats[cat]));
+  else toast(t('expenseAdded', money(amount), tripCatName(cat)));
   $('#trip-amount')?.focus();
+}
+
+// Δική τους κατηγορία εξόδων ταξιδιού: νέα ή αλλαγή υπάρχουσας
+function tripCatForm(item) {
+  const used = new Set(allTripCats().map((c) => c.color));
+  const inUse = item ? sum(state.trips, (tr) => tr.expenses.filter((e) => e.cat === item.id).length) : 0;
+  openForm({
+    title: item ? t('catTitle') : t('newCatTitle'),
+    fields: [
+      { name: 'name', label: t('name'), value: item?.name, placeholder: t('egTripCat') },
+      { name: 'color', label: t('color'), type: 'colors', options: CAT_COLORS,
+        value: item ? item.color : (CAT_COLORS.find((c) => !used.has(c)) || CAT_COLORS[0]) },
+    ],
+    onSubmit(d) {
+      if (!d.name) return t('errName');
+      if (allTripCats().some((c) => c !== item && tripCatName(c.id).trim().toLowerCase() === d.name.toLowerCase())) return t('errCatExists');
+      if (item) Object.assign(item, { name: d.name, color: d.color });
+      else {
+        const c = { id: 't_' + uid(), name: d.name, color: d.color };
+        state.tripCustomCats.push(c);
+        pickedTripCat = c.id; // διαλέγεται αμέσως για το έξοδο που γράφεις
+      }
+    },
+    deleteConfirm: inUse ? t('confirmDeleteCat', inUse) : null,
+    onDelete: item ? () => {
+      state.trips.forEach((tr) => tr.expenses.forEach((e) => { if (e.cat === item.id) e.cat = 'other'; }));
+      state.tripCustomCats = state.tripCustomCats.filter((c) => c !== item);
+      if (pickedTripCat === item.id) pickedTripCat = null;
+      if (!state.tripCustomCats.length) editTripCats = false;
+    } : null,
+  });
 }
 
 function tripExpenseForm(tr, e) {
@@ -974,7 +1021,7 @@ function tripExpenseForm(tr, e) {
     title: t('expenseTitle'),
     fields: [
       { name: 'amount', label: t('amount'), type: 'money', value: e.amount },
-      { name: 'cat', label: t('category'), type: 'select', value: e.cat, options: TRIP_CATS.map((c) => ({ value: c.id, label: L.tripCats[c.id] })) },
+      { name: 'cat', label: t('category'), type: 'select', value: e.cat, options: allTripCats().map((c) => ({ value: c.id, label: tripCatName(c.id) })) },
       { name: 'note', label: t('note'), value: e.note },
       { name: 'date', label: t('date'), type: 'date', value: e.date },
     ],
@@ -1446,7 +1493,14 @@ const actions = {
     tr.done = !tr.done;
     save(); renderTrips();
   },
+  'trip-add-cat'() { tripCatForm(null); },
+  'trip-toggle-edit-cats'() { editTripCats = !editTripCats; renderTrips(); },
   'trip-pick-cat'(d, el) {
+    if (editTripCats) {
+      const custom = state.tripCustomCats.find((c) => c.id === d.cat);
+      if (custom) tripCatForm(custom);
+      return;
+    }
     pickedTripCat = d.cat;
     el.parentElement.querySelectorAll('.cat').forEach((b) => b.classList.toggle('active', b === el));
     const amt = $('#trip-amount');
